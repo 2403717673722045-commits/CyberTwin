@@ -1,7 +1,7 @@
 {
     "model_version": "1.0",
-    "training_date": "2026-10-05T12:42:00.211855",
-    "dataset": "Phishing Websites Subset",
+    "training_date": "2026-10-05T13:52:53.609110",
+    "dataset": "data/raw/urldata.csv (Domain + Label columns; 0=Benign, 1=Phishing)",
     "classes": [
         "Benign",
         "Phishing/Malicious"

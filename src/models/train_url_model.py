@@ -8,16 +8,25 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score, 
+from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score,
                              roc_auc_score, confusion_matrix)
+import matplotlib
+matplotlib.use("Agg")  # headless-safe figure generation
 import matplotlib.pyplot as plt
 import seaborn as sns
 import re
 from urllib.parse import urlparse
 from src.features.url_features import extract_url_features
 
+FIG_DIR = os.path.join("reports", "figures")
+URL_MODEL_DIR = os.path.join("models", "url")
+META_DIR = os.path.join("models", "metadata")
+
 def train_url_model():
     print("Loading URL dataset...")
+    os.makedirs(FIG_DIR, exist_ok=True)
+    os.makedirs(URL_MODEL_DIR, exist_ok=True)
+    os.makedirs(META_DIR, exist_ok=True)
     data_path = os.path.join("data", "raw", "urldata.csv")
     
     # Read the dataset. Since the URL dataset might have different columns, let's assume it has 'domain' and 'label'
@@ -46,6 +55,8 @@ def train_url_model():
         df['target'] = df[label_col].apply(lambda x: 1 if str(x).lower() in ['bad', 'phishing', '1'] else 0)
     else:
         df['target'] = df[label_col]
+    assert set(df['target'].dropna().unique()) <= {0, 1}, \
+        f"unexpected URL label values: {df['target'].unique()}"
         
     print(f"Original shape: {df.shape}")
     df = df.drop_duplicates().reset_index(drop=True)
@@ -82,8 +93,11 @@ def train_url_model():
     print("Training Random Forest with PCA for URLs...")
     full_pipeline.fit(X_train, y_train)
     
-    # Plot PCA 2D representation for visualization
-    X_train_pca = struct_pipeline.fit_transform(X_train)
+    # Plot PCA 2D representation for visualization.
+    # Uses the ALREADY-FITTED preprocessing (transform only — the fitted
+    # production pipeline is never refit here). The classifier does not
+    # depend on this visualization in any way.
+    X_train_pca = struct_pipeline.transform(X_train)
     if X_train_pca.shape[1] >= 2:
         plt.figure(figsize=(8, 6))
         scatter = plt.scatter(X_train_pca[:, 0], X_train_pca[:, 1], c=y_train, cmap='coolwarm', alpha=0.5)
@@ -91,7 +105,11 @@ def train_url_model():
         plt.title('PCA 2D Representation of URL Features')
         plt.xlabel('Principal Component 1')
         plt.ylabel('Principal Component 2')
-        plt.savefig('reports/figures/url_pca_scatter.png')
+        plt.savefig(os.path.join(FIG_DIR, 'url_pca_scatter.png'))
+        plt.close()
+    else:
+        print(f"PCA visualization skipped: only {X_train_pca.shape[1]} component(s) "
+              "available (need at least 2 for a 2D scatter).")
     
     # Evaluate
     print("Evaluating on UNTOUCHED TEST SET...")
@@ -115,18 +133,19 @@ def train_url_model():
     plt.title('URL Model Confusion Matrix')
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')
-    plt.savefig('reports/figures/url_confusion_matrix.png')
-    
-    # Save Model
+    plt.savefig(os.path.join(FIG_DIR, 'url_confusion_matrix.png'))
+    plt.close()
+
+    # Save Model (directories were created at the start of training)
     print("Saving URL model...")
-    model_dir = os.path.join("models", "url")
-    meta_dir = os.path.join("models", "metadata")
+    model_dir = URL_MODEL_DIR
+    meta_dir = META_DIR
     joblib.dump(full_pipeline, os.path.join(model_dir, "final_url_model.joblib"))
     
     metadata = {
         "model_version": "1.0",
         "training_date": datetime.now().isoformat(),
-        "dataset": "Phishing Websites Subset",
+        "dataset": "data/raw/urldata.csv (Domain + Label columns; 0=Benign, 1=Phishing)",
         "classes": ["Benign", "Phishing/Malicious"],
         "metrics": {
             "test_accuracy": acc,
