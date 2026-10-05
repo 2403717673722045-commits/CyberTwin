@@ -535,6 +535,57 @@ def build_explanation(threat_type, se, url_results, indicators) -> tuple:
     return why, objective, "; ".join(targeted), safe
 
 
+def build_psychology_chain(se, threat_type):
+    chain = []
+    # Attacker's Perspective Pipeline
+    chain.append("1. Target Selection (Broad spray or targeted via dataset)")
+    
+    if se.get("authority", {}).get("present") or se.get("impersonation", {}).get("present"):
+        chain.append("2. Trust Building / Impersonation (Pretending to be a known entity or authority)")
+    else:
+        chain.append("2. Attention Grabber (Unexpected message or offer)")
+        
+    if se.get("emotional", {}).get("present") or se.get("fear_threat", {}).get("present") or se.get("reward", {}).get("present"):
+        chain.append("3. Emotional Trigger (Activating fear, curiosity, or greed)")
+        
+    if se.get("urgency", {}).get("present"):
+        chain.append("4. Urgency Creation / Decision Pressure (Forcing action before critical thinking kicks in)")
+        
+    if se.get("credential_request", {}).get("present"):
+        chain.append("5. Action Request (Demanding OTPs, passwords, or login)")
+        chain.append("6. Credential Extraction / Account Takeover")
+    elif se.get("financial_pressure", {}).get("present"):
+        chain.append("5. Action Request (Demanding payment, fee, or UPI transfer)")
+        chain.append("6. Financial Extraction / Fraud")
+    elif se.get("curiosity", {}).get("present"):
+        chain.append("5. Action Request (Clicking malicious link or downloading payload)")
+        chain.append("6. Payload Delivery / Phishing")
+    else:
+        chain.append("5. Action Request (Engaging the user further)")
+        
+    return chain
+
+def build_recommendations(risk_level, threat_type, se):
+    recs = []
+    if risk_level in ["Critical", "High"]:
+        recs.append("🚨 Do not click any links, open attachments, or scan QR codes in this message.")
+        if se.get("credential_request", {}).get("present"):
+            recs.append("🚨 Do NOT enter any passwords, OTPs, or PINs. If you already did, change your password immediately and enable MFA.")
+        if se.get("financial_pressure", {}).get("present"):
+            recs.append("🚨 Do NOT authorize any payments or UPI transfers. Ignore refund or fee demands.")
+        recs.append("⚠️ Verify the organization through its official app, website, or customer care number (type it yourself, do not use provided numbers).")
+        recs.append("🛑 Do not reply to the sender. Block the sender and delete the message.")
+        recs.append("📄 Use the Evidence/Complaint module to generate a report if necessary.")
+    elif risk_level == "Medium":
+        recs.append("⚠️ Proceed with extreme caution. This contains suspicious elements.")
+        recs.append("⚠️ Verify the sender identity through a separate, trusted channel.")
+        recs.append("🛑 Do not provide sensitive information unless absolutely certain.")
+    else:
+        recs.append("✅ No strong malicious indicators detected, but always remain vigilant.")
+        recs.append("ℹ️ Phishing can sometimes evade detection. Always verify unexpected requests.")
+        
+    return recs
+
 def analyze_threat(message="", url_input="", sender="", channel="Message", extra_context="") -> dict:
     """Main entry used by app.py. Returns a full analysis dict."""
     combined_text = " ".join([t for t in [message, url_input, sender, extra_context] if t]).strip()
@@ -590,6 +641,9 @@ def analyze_threat(message="", url_input="", sender="", channel="Message", extra
     level = risk_level(score)
     confidence = "High" if score >= 60 or len(indicators) >= 4 else ("Medium" if score >= 30 else "Low")
     why, objective, targeted, safe = build_explanation(threat_type, se, url_results, indicators)
+    
+    psychology_chain = build_psychology_chain(se, threat_type)
+    recommendations = build_recommendations(level, threat_type, se)
 
     # suspicious indicator chips (short)
     chips = []
@@ -622,6 +676,8 @@ def analyze_threat(message="", url_input="", sender="", channel="Message", extra
         "targeted": targeted,
         "why_risky": why,
         "safe_action": safe,
+        "psychology_chain": psychology_chain,
+        "recommendations": recommendations,
         "raw_text": combined_text[:2000],
         "sender": sender or "",
         # ADDITIVE keys (old readers ignore them safely):

@@ -1,6 +1,6 @@
 {
     "model_version": "1.0",
-    "training_date": "2026-10-05T10:37:33.010942",
+    "training_date": "2026-10-05T12:42:21.912320",
     "dataset": "SMS Spam Collection",
     "classes": [
         "Benign",

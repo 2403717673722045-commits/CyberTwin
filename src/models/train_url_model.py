@@ -63,10 +63,13 @@ def train_url_model():
     X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=0.15, random_state=42, stratify=y)
     X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.1765, random_state=42, stratify=y_train_val)
     
+    from sklearn.decomposition import PCA
+    
     # Pipeline
     struct_pipeline = Pipeline([
         ('extractor', FunctionTransformer(extract_url_features, validate=False)),
-        ('scaler', StandardScaler())
+        ('scaler', StandardScaler()),
+        ('pca', PCA(n_components=0.95, random_state=42)) # keep 95% variance
     ])
     
     clf = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42, class_weight='balanced')
@@ -76,8 +79,19 @@ def train_url_model():
         ('classifier', clf)
     ])
     
-    print("Training Random Forest for URLs...")
+    print("Training Random Forest with PCA for URLs...")
     full_pipeline.fit(X_train, y_train)
+    
+    # Plot PCA 2D representation for visualization
+    X_train_pca = struct_pipeline.fit_transform(X_train)
+    if X_train_pca.shape[1] >= 2:
+        plt.figure(figsize=(8, 6))
+        scatter = plt.scatter(X_train_pca[:, 0], X_train_pca[:, 1], c=y_train, cmap='coolwarm', alpha=0.5)
+        plt.colorbar(scatter, label='Phishing (1) vs Benign (0)')
+        plt.title('PCA 2D Representation of URL Features')
+        plt.xlabel('Principal Component 1')
+        plt.ylabel('Principal Component 2')
+        plt.savefig('reports/figures/url_pca_scatter.png')
     
     # Evaluate
     print("Evaluating on UNTOUCHED TEST SET...")

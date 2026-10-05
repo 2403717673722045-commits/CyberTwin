@@ -81,6 +81,21 @@ def train_text_model():
     
     full_pipeline.fit(X_train, y_train)
     
+    # Plot PCA/SVD 2D representation for visualization
+    # We will extract just the first 2 components from the TruncatedSVD step
+    X_train_features = features.fit_transform(X_train)
+    # The text pipeline is the first one in FeatureUnion, and SVD outputs 100 components.
+    # We can just take the first two for a 2D scatter plot.
+    if X_train_features.shape[1] >= 2:
+        plt.figure(figsize=(8, 6))
+        # The SVD components are the first 100 columns
+        scatter = plt.scatter(X_train_features[:, 0], X_train_features[:, 1], c=y_train, cmap='coolwarm', alpha=0.5)
+        plt.colorbar(scatter, label='Phishing/Scam (1) vs Benign (0)')
+        plt.title('PCA (SVD) 2D Representation of Text Features')
+        plt.xlabel('Principal Component 1')
+        plt.ylabel('Principal Component 2')
+        plt.savefig('reports/figures/text_pca_scatter.png')
+    
     # Evaluate on validation
     y_val_pred = full_pipeline.predict(X_val)
     y_val_prob = full_pipeline.predict_proba(X_val)[:, 1]

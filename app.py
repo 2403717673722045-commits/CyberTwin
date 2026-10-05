@@ -532,79 +532,73 @@ elif page == "Threat Analysis":
             st.session_state["demo_text"] = samples[dc]
             st.rerun()
     st.markdown("<div class='glass'>", unsafe_allow_html=True)
-    st.markdown("**🖥️ Analysis Console** <span class='small'>— input tabs feed one engine, one workflow</span>", unsafe_allow_html=True)
-    tab_msg, tab_url, tab_shot, tab_qr = st.tabs(["✉️ Message / Email", "🔗 URL", "📷 Screenshot", "◧ QR Code"])
-    channel = st.selectbox("Channel", ["Message", "Email", "SMS", "WhatsApp", "URL", "Payment request", "Social media"])
-    sender = st.text_input("Sender email / phone / profile (optional)", placeholder="e.g. +91-98XXXXXX or support@hdfc-secure.tk")
-    with tab_msg:
-        message = st.text_area("Suspicious text / email / message", value=st.session_state.pop("demo_text", ""),
-                               height=140, placeholder="Paste the full message here…")
-    with tab_url:
-        st.caption("Dedicated URL lane — also auto-extracted from the message tab.")
-        url_input_tab = st.text_input("URL to inspect", placeholder="https://…", key="url_tab_input")
-        if url_input_tab:
-            rr = analyze_single_url(url_input_tab)
-            st.markdown(f"**Host:** `{rr.get('host', '-')}` | +{rr['added_risk']}")
-            for ind in rr["indicators"]:
-                st.markdown(f"- {ind}")
-            st.info(f"Verdict: {url_verdict(rr)}")
-    with tab_shot:
-        shot = st.file_uploader("Upload Screenshot", type=["png", "jpg", "jpeg", "webp"], key="shot_up")
-        if shot:
-            try:
-                from PIL import Image as _Img
-                from media_utils import ocr_image as _ocr
-                img = _Img.open(shot).convert("RGB")
-                st.image(img, caption="Screenshot (evidence reference, processed locally)", use_container_width=True)
-                r = _ocr(img)
-                if r["text"]:
-                    st.success(r["message"])
-                    st.session_state.screenshot_note = f"Image '{shot.name}' OCR: {len(r['text'])} chars extracted."
-                    with st.expander("OCR extracted text (added to analysis)"):
-                        st.write(r["text"])
-                    st.session_state["_ocr_text"] = r["text"]
-                else:
-                    st.warning(r["message"] + " — type/paste the text manually.")
-                    st.session_state.screenshot_note = f"Image '{shot.name}' provided; OCR unavailable."
-            except ImportError:
-                st.warning("Pillow not installed. Run: pip install Pillow")
-    with tab_qr:
-        qr = st.file_uploader("Upload QR Code", type=["png", "jpg", "jpeg", "webp"], key="qr_up")
-        if qr:
-            try:
-                from PIL import Image as _Img2
-                from media_utils import decode_qr as _dq
-                img2 = _Img2.open(qr).convert("RGB")
-                st.image(img2, caption="QR image", use_container_width=True)
-                d = _dq(img2)
-                if d["data"]:
-                    st.success(d["message"])
-                    st.code(d["data"][:500])
-                    st.session_state.qr_data = d["data"]
-                    st.session_state.qr_note = f"QR '{qr.name}' decoded ({d['kind']}): {d['data'][:200]}"
-                else:
-                    st.warning(d["message"])
-            except ImportError:
-                st.warning("Install: pip install Pillow opencv-python")
+    st.markdown("**🖥️ Smart Input Analysis** <span class='small'>— paste text, a URL, or upload an image. CyberTwin will automatically detect and route it.</span>", unsafe_allow_html=True)
+    
+    smart_text = st.text_area("Paste a message, email, URL, or incident description", value=st.session_state.pop("demo_text", ""), height=120, placeholder="Paste suspicious content here…")
+    smart_image = st.file_uploader("OR Upload an Image (Screenshot / QR Code)", type=["png", "jpg", "jpeg", "webp"], key="smart_up")
+    
     c3a, c3b = st.columns(2)
     with c3a:
-        url_input = st.text_input("URL (if any, separate or inside message)", value=st.session_state.get("url_tab_input", ""), placeholder="https://…")
+        sender = st.text_input("Sender email / phone / profile (optional)", placeholder="e.g. +91-98XXXXXX or support@hdfc-secure.tk")
         payment = st.text_input("Payment / scam request details (optional)", placeholder="e.g. UPI collect request of ₹4,999")
     with c3b:
         social = st.text_input("Social media / profile info (optional)", placeholder="e.g. Instagram profile, 12 followers, joined this month")
-        incident = st.text_area("Incident description (optional)", height=68, placeholder="What happened so far?")
-    if st.session_state.get("qr_data"):
-        url_input = (url_input + " " + st.session_state.qr_data)[:2000]
-    _ocr_extra = st.session_state.pop("_ocr_text", "")
-    if _ocr_extra:
-        message = (message + "\n" + _ocr_extra)[:4000]
+        incident = st.text_area("Additional context (optional)", height=68, placeholder="What happened so far?")
+        
     if st.button("🔎 Analyze Threat", type="primary", use_container_width=True):
-        if not (message or url_input or payment or social or incident):
-            st.warning("Paste at least a message, URL or description first.")
+        if not (smart_text or smart_image or payment or social or incident):
+            st.warning("Please provide some input (text, URL, or image) to analyze.")
         else:
-            with st.spinner("Analysing signals…"):
+            with st.spinner("Analyzing input and routing to ML models…"):
+                from src.input_detection.input_classifier import detect_input_type
+                
+                pil_img = None
+                if smart_image:
+                    try:
+                        from PIL import Image as _Img
+                        pil_img = _Img.open(smart_image).convert("RGB")
+                        st.image(pil_img, caption="Uploaded Image", use_container_width=True)
+                    except Exception as e:
+                        st.error(f"Image load failed: {e}")
+                
+                # Detect input type
+                detection = detect_input_type(smart_text, pil_img)
+                
+                # Show detection summary UI
+                st.markdown("### 🤖 Automatic Input Detection")
+                c_d1, c_d2, c_d3 = st.columns(3)
+                c_d1.metric("Detected Type", detection["primary_type"])
+                c_d2.metric("Detection Method", detection["detection_method"])
+                c_d3.metric("Components Used", ", ".join(detection["components"]) if detection["components"] else "None")
+                
+                if detection["routing"]:
+                    st.info(f"**Analysis Pipeline:** Input → {' → '.join(detection['routing'])} → Risk Engine")
+                    
+                if detection.get("extracted_text") and smart_image:
+                    with st.expander("OCR extracted text (added to analysis)"):
+                        st.write(detection["extracted_text"])
+                if detection.get("extracted_urls") and smart_image:
+                    with st.expander("Extracted URL(s)"):
+                        for u in detection["extracted_urls"]:
+                            st.write(u)
+                
+                # Extract combined inputs for Threat Engine
+                message = detection["extracted_text"]
+                url_input = " ".join(detection["extracted_urls"])
+                
+                # If there's extra manual context, append it
+                cnn_context = ""
+                if detection.get("cnn_predictions"):
+                    cnn_context = f"[Image Type: {detection['image_type']} | CNN Objects: {', '.join(detection['cnn_predictions'])}]"
+                    with st.expander("CNN Image Classification"):
+                        st.write(f"**Image Type:** {detection['image_type']}")
+                        st.write(f"**Detected Objects:** {', '.join(detection['cnn_predictions'])}")
+                    
+                if payment or social or incident:
+                    message += "\n" + " ".join(filter(None, [payment, social, incident]))
+                
                 res = analyze_threat(message=message, url_input=url_input, sender=sender,
-                                     channel=channel, extra_context=" ".join([payment, social, incident]))
+                                     channel="Auto-detected", extra_context=cnn_context)
                 st.session_state.analysis = res
                 st.session_state.sim = simulate_action(res)
                 st.session_state.evidence = {
@@ -613,9 +607,9 @@ elif page == "Threat Analysis":
                     "datetime": res.get("timestamp", ""),
                     "transaction": payment, "upi": payment, "social": social,
                     "evidence_desc": incident,
-                    "screenshot_note": st.session_state.get("screenshot_note", ""),
-                    "qr_note": st.session_state.get("qr_note", ""),
-                    "qr_data": st.session_state.get("qr_data", ""),
+                    "screenshot_note": f"Type: {detection['primary_type']}" if smart_image else "",
+                    "qr_note": "",
+                    "qr_data": url_input if "QR" in detection["primary_type"] else "",
                 }
                 push_history(res)
             st.success("Analysis complete — results below feed Simulator, Copilot, Evidence & Complaint pages.")
@@ -640,6 +634,19 @@ elif page == "Threat Analysis":
         st.markdown(f"<div class='glass'><b>Attacker objective (assessed):</b> {a['attacker_objective']}<br>"
                     f"<b>Targeted:</b> {a['targeted']}<br><b>Safe action:</b> {a['safe_action']}</div>",
                     unsafe_allow_html=True)
+                    
+        st.markdown("#### 🧠 Psychology Attack Chain")
+        st.markdown("<div class='glass'>", unsafe_allow_html=True)
+        for idx, step in enumerate(a.get("psychology_chain", [])):
+            st.markdown(f"**{step}**")
+            if idx < len(a.get("psychology_chain", [])) - 1:
+                st.markdown("⬇️")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.markdown("#### ✅ Recommended Defensive Actions")
+        for rec in a.get("recommendations", []):
+            st.info(rec)
+
         with st.expander("Why this is risky", expanded=True):
             for w in a["why_risky"]:
                 st.markdown(f"- {w}")
@@ -1094,11 +1101,19 @@ elif page == "ML Model Lab":
             c3.metric("Test Precision", f"{t_meta['metrics']['test_precision']:.2%}")
             c4.metric("Test Recall", f"{t_meta['metrics']['test_recall']:.2%}")
             
-            st.markdown("### Confusion Matrix")
-            try:
-                st.image("reports/figures/text_confusion_matrix.png", use_container_width=True)
-            except Exception:
-                st.info("Confusion matrix image not available.")
+            p1, p2 = st.columns(2)
+            with p1:
+                st.markdown("### Confusion Matrix")
+                try:
+                    st.image("reports/figures/text_confusion_matrix.png", use_container_width=True)
+                except Exception:
+                    st.info("Confusion matrix image not available.")
+            with p2:
+                st.markdown("### PCA / SVD Visualization")
+                try:
+                    st.image("reports/figures/text_pca_scatter.png", use_container_width=True)
+                except Exception:
+                    st.info("PCA visualization not available. Retrain the model.")
         else:
             st.warning("Text model metadata not found. Train the model first.")
 
@@ -1115,21 +1130,32 @@ elif page == "ML Model Lab":
             c3.metric("Test Precision", f"{u_meta['metrics']['test_precision']:.2%}")
             c4.metric("Test Recall", f"{u_meta['metrics']['test_recall']:.2%}")
             
-            st.markdown("### Confusion Matrix")
-            try:
-                st.image("reports/figures/url_confusion_matrix.png", use_container_width=True)
-            except Exception:
-                st.info("Confusion matrix image not available.")
+            p1, p2 = st.columns(2)
+            with p1:
+                st.markdown("### Confusion Matrix")
+                try:
+                    st.image("reports/figures/url_confusion_matrix.png", use_container_width=True)
+                except Exception:
+                    st.info("Confusion matrix image not available.")
+            with p2:
+                st.markdown("### PCA Visualization")
+                try:
+                    st.image("reports/figures/url_pca_scatter.png", use_container_width=True)
+                except Exception:
+                    st.info("PCA visualization not available. Retrain the model.")
         else:
             st.warning("URL model metadata not found. Train the model first.")
 
     with t3:
         st.markdown("### 📊 Status")
-        st.markdown("✓ **OCR:** Available  \n✓ **QR Decoder:** Available")
+        st.markdown("✓ **CNN Classifier (MobileNetV2):** Available (if TF installed)\n✓ **OCR:** Available  \n✓ **QR Decoder:** Available")
         
         st.markdown("### 🖼️ Image Input Types")
         st.markdown("- Screenshot\n- Image containing text\n- Image containing QR code\n- Screenshot containing suspicious URL/text")
         
+        st.markdown("### 🧠 CNN Image Engine")
+        st.markdown("**Model:** MobileNetV2 (Pre-trained on ImageNet)  \n**Library:** `tensorflow` / `keras`  \n**Input:** Images / Screenshots  \n**Output:** Semantic Object Probabilities & Interface Type (e.g., 'Login Screen')")
+
         st.markdown("### 👁️ OCR Engine")
         st.markdown("**Engine:** Tesseract  \n**Library:** `pytesseract`  \n**Input:** Images / Screenshots  \n**Output:** Extracted Text  \n**Preprocessing:** None (Raw PIL Image to string)")
         
@@ -1139,11 +1165,11 @@ elif page == "ML Model Lab":
         st.markdown("### 🔄 Pipeline")
         st.code('''Image
  ↓
-Preprocessing (OpenCV BGR Conversion)
+Preprocessing (OpenCV BGR Conversion / MobileNetV2 Normalization)
  ↓
-OCR / QR Detection
+CNN Feature Extraction + OCR + QR Detection
  ↓
-Text / URL Extraction
+Text / URL Extraction & Image Type Detection
  ↓
 Text Model / URL Model
  ↓

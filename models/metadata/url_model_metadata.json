@@ -1,18 +1,18 @@
 {
     "model_version": "1.0",
-    "training_date": "2026-10-05T11:39:59.728953",
+    "training_date": "2026-10-05T12:42:00.211855",
     "dataset": "Phishing Websites Subset",
     "classes": [
         "Benign",
         "Phishing/Malicious"
     ],
     "metrics": {
-        "test_accuracy": 0.7503805175038052,
-        "test_precision": 0.9882075471698113,
-        "test_recall": 0.7249134948096886,
-        "test_f1": 0.8363273453093812,
-        "test_roc_auc": 0.8860649993429984,
+        "test_accuracy": 0.7519025875190258,
+        "test_precision": 0.9882352941176471,
+        "test_recall": 0.726643598615917,
+        "test_f1": 0.8374875373878365,
+        "test_roc_auc": 0.8767136787700933,
         "false_positive_rate": 0.06329113924050633,
-        "false_negative_rate": 0.2750865051903114
+        "false_negative_rate": 0.27335640138408307
     }
 }
