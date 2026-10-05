@@ -1,0 +1,18 @@
+{
+    "model_version": "1.0",
+    "training_date": "2026-10-05T11:39:59.728953",
+    "dataset": "Phishing Websites Subset",
+    "classes": [
+        "Benign",
+        "Phishing/Malicious"
+    ],
+    "metrics": {
+        "test_accuracy": 0.7503805175038052,
+        "test_precision": 0.9882075471698113,
+        "test_recall": 0.7249134948096886,
+        "test_f1": 0.8363273453093812,
+        "test_roc_auc": 0.8860649993429984,
+        "false_positive_rate": 0.06329113924050633,
+        "false_negative_rate": 0.2750865051903114
+    }
+}

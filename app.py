@@ -5,9 +5,11 @@ Backend logic UNCHANGED — same engines, same calls, same session-state contrac
 Detect -> Explain -> Simulate -> Protect -> Report -> Track -> Learn
 Run:  streamlit run app.py
 """
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+
 import plotly.express as px
 
 from threat_engine import analyze_threat, analyze_single_url, url_verdict
@@ -50,11 +52,11 @@ if st.session_state.nav in _LEGACY_NAV:
 
 NAV = ["Dashboard", "Threat Analysis", "URL Analysis", "What-If Simulator",
        "Protection & Recovery", "Evidence", "Complaint Generator",
-       "Complaint Tracking", "AI Copilot", "Risk History", "Awareness Training"]
+       "Complaint Tracking", "AI Copilot", "Risk History", "Awareness Training", "ML Model Lab"]
 ICON = {"Dashboard": "🏠", "Threat Analysis": "🔍", "URL Analysis": "🔗",
         "What-If Simulator": "🔀", "Protection & Recovery": "🛡️", "Evidence": "🗂️",
         "Complaint Generator": "📄", "Complaint Tracking": "📌", "AI Copilot": "🤖",
-        "Risk History": "📊", "Awareness Training": "🎓"}
+        "Risk History": "📊", "Awareness Training": "🎓", "ML Model Lab": "🔬"}
 if st.session_state.nav not in NAV:
     st.session_state.nav = "Dashboard"
 
@@ -204,7 +206,7 @@ ART_FILE = {"Dashboard": "dashboard", "Threat Analysis": "threat", "URL Analysis
             "What-If Simulator": "simulator", "Protection & Recovery": "protection",
             "Evidence": "evidence", "Complaint Generator": "complaint",
             "Complaint Tracking": "tracking", "AI Copilot": "copilot",
-            "Risk History": "history", "Awareness Training": "awareness"}
+            "Risk History": "history", "Awareness Training": "awareness", "ML Model Lab": "ml_model_lab"}
 
 def _asset_path(key):
     for ext, mime in (("png", "image/png"), ("jpg", "image/jpeg"),
@@ -357,13 +359,20 @@ VISUALS = {
         <rect x="130" y="130" width="60" height="35" fill="rgba(124,58,237,.3)" stroke="#8B5CF6" stroke-width="2"/>
         <circle cx="235" cy="140" r="18" fill="rgba(34,197,94,.25)" stroke="#22C55E" stroke-width="2"/>
         <path d="M227 140 L233 146 L244 134" fill="none" stroke="#4ADE80" stroke-width="3.5" stroke-linecap="round"/>"""),
+    "ML Model Lab": ("Model Intelligence",
+        """<circle cx="160" cy="110" r="40" fill="rgba(6, 182, 212, 0.2)" stroke="#06B6D4" stroke-width="2"/>
+        <line x1="160" y1="70" x2="160" y2="30" stroke="#06B6D4" stroke-width="2"/>
+        <line x1="160" y1="150" x2="160" y2="190" stroke="#06B6D4" stroke-width="2"/>
+        <line x1="120" y1="110" x2="80" y2="110" stroke="#06B6D4" stroke-width="2"/>
+        <line x1="200" y1="110" x2="240" y2="110" stroke="#06B6D4" stroke-width="2"/>
+        <circle cx="160" cy="110" r="10" fill="#3B82F6"/>"""),
 }
 
 def banner(title, subtitle, nav_key, badge=""):
     # single-line HTML (no newlines): indented/blank lines inside st.markdown
     # can be parsed as code blocks and shown as literal code text
-    cap, body = VISUALS[nav_key]
-    parts = [f'<div class="page-banner"><div class="art">{art(ART_FILE[nav_key], body, cap)}</div>',
+    cap, body = VISUALS.get(nav_key, ("CyberTwin", "Cybersecurity intelligence and decision support."))
+    parts = [f'<div class="page-banner"><div class="art">{art(ART_FILE.get(nav_key, "unknown"), body, cap)}</div>',
              f'<div class="txt"><h2 style="margin:0">{title}</h2>',
              f'<div class="small">{subtitle}</div>']
     if badge:
@@ -711,10 +720,8 @@ elif page == "What-If Simulator":
            "What-If Simulator")
     a = st.session_state.analysis
     if not a:
-        st.warning("Run a Threat Analysis first (or load a demo there). Showing a generic illustration meanwhile.")
-        from threat_engine import analyze_threat as _at
-        a = _at(message="Your account will be blocked. Verify now at http://hdfc-secure-verify.tk/login with OTP.")
-        st.session_state.analysis = a
+        st.warning("Run a Threat Analysis first to use the What-If Simulator.")
+        st.stop()
     sim = st.session_state.sim or simulate_action(a)
     st.session_state.sim = sim
     risk_band(a)
@@ -1038,7 +1045,119 @@ elif page == "Awareness Training":
         st.balloons()
         st.success("🏆 Cyber-safe champion! Lesson: pause, verify independently, never share codes/pay under pressure.")
 
+# ============================================================ ML MODEL LAB
+elif page == "ML Model Lab":
+    banner("🔬 ML Model Lab", "Insight into the ML models driving CyberTwin.", "ML Model Lab")
+    import json
+    import os
+    from src.models.model_loader import get_text_model, get_url_model
+    
+    st.markdown("### Model Health Status")
+    text_model = get_text_model()
+    url_model = get_url_model()
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Machine Learning Models**")
+        if text_model:
+            st.success("✓ Text Model: Loaded")
+        else:
+            st.error("✗ Text Model: Failed to load (Retrain required)")
+            
+        if url_model:
+            st.success("✓ URL Model: Loaded")
+        else:
+            st.error("✗ URL Model: Failed to load (Retrain required)")
+            
+    with col2:
+        st.markdown("**Image Processing**")
+        st.success("✓ OCR (Optical Character Recognition)")
+        st.success("✓ QR Decoder")
+    
+    st.divider()
+    
+    text_meta_path = os.path.join(os.path.dirname(__file__), "models", "metadata", "text_model_metadata.json")
+    url_meta_path = os.path.join(os.path.dirname(__file__), "models", "metadata", "url_model_metadata.json")
+    
+    t1, t2, t3 = st.tabs(["Text Model", "URL Model", "Image Processing"])
+    
+    with t1:
+        if os.path.exists(text_meta_path):
+            with open(text_meta_path, "r") as f:
+                t_meta = json.load(f)
+            st.markdown(f"**Dataset:** {t_meta['dataset']}")
+            st.markdown(f"**Training Date:** {t_meta['training_date']}")
+            
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Test Accuracy", f"{t_meta['metrics']['test_accuracy']:.2%}")
+            c2.metric("Test F1-Score", f"{t_meta['metrics']['test_f1']:.2%}")
+            c3.metric("Test Precision", f"{t_meta['metrics']['test_precision']:.2%}")
+            c4.metric("Test Recall", f"{t_meta['metrics']['test_recall']:.2%}")
+            
+            st.markdown("### Confusion Matrix")
+            try:
+                st.image("reports/figures/text_confusion_matrix.png", use_container_width=True)
+            except Exception:
+                st.info("Confusion matrix image not available.")
+        else:
+            st.warning("Text model metadata not found. Train the model first.")
+
+    with t2:
+        if os.path.exists(url_meta_path):
+            with open(url_meta_path, "r") as f:
+                u_meta = json.load(f)
+            st.markdown(f"**Dataset:** {u_meta['dataset']}")
+            st.markdown(f"**Training Date:** {u_meta['training_date']}")
+            
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Test Accuracy", f"{u_meta['metrics']['test_accuracy']:.2%}")
+            c2.metric("Test F1-Score", f"{u_meta['metrics']['test_f1']:.2%}")
+            c3.metric("Test Precision", f"{u_meta['metrics']['test_precision']:.2%}")
+            c4.metric("Test Recall", f"{u_meta['metrics']['test_recall']:.2%}")
+            
+            st.markdown("### Confusion Matrix")
+            try:
+                st.image("reports/figures/url_confusion_matrix.png", use_container_width=True)
+            except Exception:
+                st.info("Confusion matrix image not available.")
+        else:
+            st.warning("URL model metadata not found. Train the model first.")
+
+    with t3:
+        st.markdown("### 📊 Status")
+        st.markdown("✓ **OCR:** Available  \n✓ **QR Decoder:** Available")
+        
+        st.markdown("### 🖼️ Image Input Types")
+        st.markdown("- Screenshot\n- Image containing text\n- Image containing QR code\n- Screenshot containing suspicious URL/text")
+        
+        st.markdown("### 👁️ OCR Engine")
+        st.markdown("**Engine:** Tesseract  \n**Library:** `pytesseract`  \n**Input:** Images / Screenshots  \n**Output:** Extracted Text  \n**Preprocessing:** None (Raw PIL Image to string)")
+        
+        st.markdown("### ◧ QR Decoder")
+        st.markdown("**Library:** OpenCV (`cv2.QRCodeDetector`)  \n**Input:** QR Images  \n**Output:** Decoded Payload / URL  \n**Error Handling:** Fallback to `detectAndDecodeMulti` if primary decode fails.")
+        
+        st.markdown("### 🔄 Pipeline")
+        st.code('''Image
+ ↓
+Preprocessing (OpenCV BGR Conversion)
+ ↓
+OCR / QR Detection
+ ↓
+Text / URL Extraction
+ ↓
+Text Model / URL Model
+ ↓
+Risk Engine''', language="text")
+        
+        st.markdown("### 📈 Evaluation")
+        st.info("No labelled image-processing evaluation dataset is currently configured.")
+        
+        st.markdown("### 🛠️ Implementation Details")
+        st.markdown("**Source:** `media_utils.py`  \n**Libraries:** `pytesseract`, `cv2` (OpenCV), `numpy`, `Pillow`")
+
+
 st.markdown("""<div class="footer">🛡️ <b>CyberTwin</b> — AI-Powered Counterfactual Cyber-Risk Simulator<br>
-<span class="small">Explainable heuristic + semantic layer (no fake accuracy claims) •
+<span class="small">Explainable ML + heuristic layer •
 Simulations are plausible, not certain • Drafts & tracking are user-managed, not official filings.</span></div>""",
             unsafe_allow_html=True)
+

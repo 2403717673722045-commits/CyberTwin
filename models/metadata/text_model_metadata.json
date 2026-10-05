@@ -1,0 +1,18 @@
+{
+    "model_version": "1.0",
+    "training_date": "2026-10-05T10:37:33.010942",
+    "dataset": "SMS Spam Collection",
+    "classes": [
+        "Benign",
+        "Phishing/Scam"
+    ],
+    "metrics": {
+        "test_accuracy": 0.9716494845360825,
+        "test_precision": 0.8584905660377359,
+        "test_recall": 0.9285714285714286,
+        "test_f1": 0.8921568627450981,
+        "test_roc_auc": 0.9930618265005118,
+        "false_positive_rate": 0.022123893805309734,
+        "false_negative_rate": 0.07142857142857142
+    }
+}

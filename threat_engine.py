@@ -16,6 +16,10 @@ import re
 from urllib.parse import urlparse
 from datetime import datetime
 
+# Import ML engines
+from src.models.risk_engine import calculate_risk
+
+
 # ---------------------------------------------------------------------------
 # 1. Text normalization
 # ---------------------------------------------------------------------------
@@ -542,12 +546,12 @@ def analyze_threat(message="", url_input="", sender="", channel="Message", extra
 
     threat_type, breakdown = classify_threat(combined_text, urls, se, sem)
 
-    # ---- risk score: weighted sum of signals ----
-    score = 5.0
-    # social engineering signals: each present signal adds weight
-    se_weights = {"urgency": 10, "fear_threat": 11, "authority": 9, "reward": 8,
-                  "financial_pressure": 13, "credential_request": 15,
-                  "curiosity": 6, "emotional": 5}
+    # ---- ML-driven risk score ----
+    risk_data = calculate_risk(combined_text, urls, se, {"url_results": url_results})
+    score = risk_data["risk_score"]
+    level = risk_data["risk_level"]
+    ml_prob = risk_data["ml_probability"]
+
     indicators = []
     label_map = {"urgency": "Urgency pressure ('act now / expire')",
                  "fear_threat": "Fear/threat language (block / penalty / legal action)",
@@ -557,25 +561,17 @@ def analyze_threat(message="", url_input="", sender="", channel="Message", extra
                  "credential_request": "Credential/OTP request",
                  "curiosity": "Click/download lure",
                  "emotional": "Emotional manipulation / secrecy"}
-    for k, w in se_weights.items():
+    
+    for k in se:
         if se.get(k, {}).get("present"):
-            score += w
-            indicators.append(f"{label_map[k]} detected.")
-
-    # semantic support
-    top_sem = max(sem.values()) if sem else 0
-    score += top_sem * 22
-
-    # structured keyword support
-    top_struct = max(breakdown.values()) if breakdown else 0
-    score += min(top_struct * 0.55, 16)
+            indicators.append(f"{label_map.get(k, k)} detected.")
 
     # url risk
     for r in url_results:
-        score += r.get("added_risk", 0)
         for ind in r["indicators"]:
             if "only means" not in ind and "No strong" not in ind:
                 indicators.append(f"URL [{r['url'][:60]}]: {ind}")
+
 
     # sender signal
     if sender and re.search(r"[+0-9]{8,}|@|unknown|private", sender, re.I):
@@ -610,6 +606,7 @@ def analyze_threat(message="", url_input="", sender="", channel="Message", extra
         "threat_type": threat_type,
         "risk_score": score,
         "risk_level": level,
+        "ml_probability": f"{ml_prob}%",
         "confidence": confidence,
         "indicators": indicators,
         "se_signals": {k: v["present"] for k, v in se.items()},

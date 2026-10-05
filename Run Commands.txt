@@ -1,0 +1,19 @@
+To run the main CyberTwin application (Inference):
+
+bash:
+streamlit run app.py
+
+If you ever want to re-train the ML models:
+Download the datasets:
+bash:
+python src/data/download_data.py
+
+Train the text and URL models (this will automatically save the new .joblib files to your models/ directory):
+bash:
+python src/models/train_text_model.py
+python src/models/train_url_model.py
+
+You can find all of this documented in the 
+
+README_ML.md
+ file that was created
